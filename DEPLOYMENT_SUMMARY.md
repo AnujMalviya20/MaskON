@@ -113,7 +113,7 @@ Navigate to: **http://localhost:8000/live.html**
 
 ### All-in-One Setup (macOS/Linux):
 ```bash
-# Clone
+# Clone6060
 git clone https://github.com/AnujMalviya20/MaskON.git && cd MaskON
 
 # Setup
