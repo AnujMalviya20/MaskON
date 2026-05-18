@@ -89,7 +89,7 @@ pip install -r backend/requirements.txt
 
 **Terminal 1 - Start Backend:**
 ```bash
-cd backend
+cd backend 5050
 python app.py
 # Backend runs on http://127.0.0.1:5000
 ```
