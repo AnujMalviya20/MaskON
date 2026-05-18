@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <title>SafeGuard AI - Real-Time Mask Detection</title>
+    <link rel="stylesheet" href="css/style.css?v=2025">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="container">
+            <div class="logo">
+                <span class="logo-text">SafeGuard AI</span>
+                <span id="liveIndicator" class="status-indicator">READY</span>
+            </div>
+            <ul class="nav-links">
+                <li><a href="index.html">Dashboard</a></li>
+                <li><a href="live.html" class="active">Monitor</a></li>
+                <li><a href="upload.html">Analyze</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <div class="monitoring-container">
+        <div class="container">
+            <div class="monitor-grid">
+                <!-- Video Feed Section -->
+                <div class="video-section">
+                    <div class="video-wrapper">
+                        <video id="video" autoplay playsinline muted style="width: 100%; height: 100%; object-fit: cover; background: #000;"></video>
+                        <canvas id="canvas" class="detection-canvas" style="position: absolute; top: 0; left: 0; z-index: 10; width: 100%; height: 100%;"></canvas>
+                    </div>
+
+                    <div class="control-buttons">
+                        <button id="startBtn" class="btn btn-primary">Start Monitoring</button>
+                        <button id="stopBtn" class="btn btn-secondary" style="display: none;">Stop Monitoring</button>
+                    </div>
+                </div>
+
+                <!-- Status Panel -->
+                <div class="status-panel">
+                    <div class="panel-section system-status">
+                        <h3 class="panel-title">System Status</h3>
+                        <div class="status-grid">
+                            <div class="status-item">
+                                <span class="label">Engine</span>
+                                <span class="value" id="engineStatus">READY</span>
+                            </div>
+                            <div class="status-item">
+                                <span class="label">FPS</span>
+                                <span class="value" id="fpsCounter">0</span>
+                            </div>
+                            <div class="status-item">
+                                <span class="label">Latency</span>
+                                <span class="value" id="latency">0ms</span>
+                            </div>
+                            <div class="status-item">
+                                <span class="label">Uptime</span>
+                                <span class="value" id="uptime">00:00</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="panel-section detection-data">
+                        <h3 class="panel-title">Detection Stats</h3>
+                        <div class="stat-boxes">
+                            <div class="stat-box">
+                                <div class="stat-label">Faces</div>
+                                <div class="stat-value" id="faceCount">0</div>
+                            </div>
+                            <div class="stat-box">
+                                <div class="stat-label">With Mask</div>
+                                <div class="stat-value stat-safe" id="maskCount">0</div>
+                            </div>
+                            <div class="stat-box">
+                                <div class="stat-label">No Mask</div>
+                                <div class="stat-value stat-unsafe" id="noMaskCount">0</div>
+                            </div>
+                            <div class="stat-box">
+                                <div class="stat-label">Confidence</div>
+                                <div class="stat-value" id="avgConfidence">0%</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="panel-section alert-section">
+                        <h3 class="panel-title">Active Alerts</h3>
+                        <div id="alertsList" class="alerts-list">
+                            <div class="no-alerts">No alerts</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Detection Details -->
+            <div class="detection-details">
+                <h3 class="details-title">Individual Detections</h3>
+                <div id="detectionsList" class="detections-grid">
+                    <div class="empty-state">Start monitoring to see detections</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Alert Notifications -->
+    <div id="alertNotifications" class="alert-notifications"></div>
+
+    <footer class="footer">
+        <div class="container">
+            <p>SafeGuard AI - Professional AI Safety Monitoring System</p>
+        </div>
+    </footer>
+
+    <script>
+        const video = document.getElementById('video');
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d', { alpha: false });
+        const startBtn = document.getElementById('startBtn');
+        const stopBtn = document.getElementById('stopBtn');
+        const faceCount = document.getElementById('faceCount');
+        const maskCount = document.getElementById('maskCount');
+        const noMaskCount = document.getElementById('noMaskCount');
+        const avgConfidence = document.getElementById('avgConfidence');
+        const fpsCounter = document.getElementById('fpsCounter');
+        const latency = document.getElementById('latency');
+        const uptime = document.getElementById('uptime');
+        const engineStatus = document.getElementById('engineStatus');
+        const liveIndicator = document.getElementById('liveIndicator');
+        const detectionsList = document.getElementById('detectionsList');
+        const alertsList = document.getElementById('alertsList');
+        const alertNotifications = document.getElementById('alertNotifications');
+
+
+        let mediaStream = null;
+        let isMonitoring = false;
+        let rafId = null;
+        let frameCount = 0;
+        let lastFrameTime = Date.now();
+        let startTime = null;
+        let lastAlerts = {};
+        let lastDetectionTime = 0;
+        let lastDetections = [];
+
+        // Always use a fixed square canvas for overlays
+        const CANVAS_SIZE = 640;
+        canvas.width = CANVAS_SIZE;
+        canvas.height = CANVAS_SIZE;
+        video.style.width = '100%';
+        video.style.height = '100%';
+        video.style.objectFit = 'cover';
+
+        startBtn.addEventListener('click', async () => {
+            try {
+                mediaStream = await navigator.mediaDevices.getUserMedia({
+                    video: { width: { ideal: 640 }, height: { ideal: 640 }, frameRate: { ideal: 30, max: 30 } },
+                    audio: false
+                });
+                video.srcObject = mediaStream;
+                // Always force canvas to square
+                canvas.width = CANVAS_SIZE;
+                canvas.height = CANVAS_SIZE;
+                video.style.objectFit = 'cover';
+                try { await video.play(); } catch (e) {}
+                startBtn.style.display = 'none';
+                stopBtn.style.display = 'block';
+                isMonitoring = true;
+                startTime = Date.now();
+                engineStatus.textContent = 'RUNNING';
+                engineStatus.className = 'value status-online';
+                liveIndicator.textContent = 'LIVE';
+                liveIndicator.style.color = '#00ff99';
+                detectionLoop();
+            } catch (error) {
+                showNotification('Camera access denied', 'error');
+            }
+        });
+
+        stopBtn.addEventListener('click', () => {
+            if (mediaStream) mediaStream.getTracks().forEach(track => track.stop());
+            video.srcObject = null;
+            stopBtn.style.display = 'none';
+            startBtn.style.display = 'block';
+            isMonitoring = false;
+            cancelAnimationFrame(rafId);
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            engineStatus.textContent = 'READY';
+            engineStatus.className = 'value';
+            liveIndicator.textContent = 'READY';
+            liveIndicator.style.color = '#666';
+            resetStats();
+        });
+
+        function detectionLoop() {
+            if (!isMonitoring) return;
+            rafId = requestAnimationFrame(detectionLoop);
+            
+            const currentTime = Date.now();
+            frameCount++;
+            
+            // Continuous rendering loop - draw video every frame
+            if (video.readyState === HTMLMediaElement.HAVE_ENOUGH_DATA) {
+                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                
+                // Draw overlay with detections
+                if (lastDetections && lastDetections.length > 0) {
+                    drawDetectionOverlay();
+                }
+            }
+            
+            // Throttled detection API calls (every 400ms for faster response)
+            if (currentTime - lastDetectionTime >= 400 && video.readyState === HTMLMediaElement.HAVE_ENOUGH_DATA) {
+                lastDetectionTime = currentTime;
+                const imageData = canvas.toDataURL('image/jpeg', 0.8);
+                detectMask(imageData);
+            }
+            
+            // Update FPS every 1 second
+            if (currentTime - lastFrameTime >= 1000) {
+                fpsCounter.textContent = frameCount;
+                frameCount = 0;
+                lastFrameTime = currentTime;
+                
+                // Update uptime
+                if (startTime) {
+                    const elapsed = Math.floor((currentTime - startTime) / 1000);
+                    const mins = Math.floor(elapsed / 60);
+                    const secs = elapsed % 60;
+                    uptime.textContent = String(mins).padStart(2, '0') + ':' + String(secs).padStart(2, '0');
+                }
+            }
+        }
+
+        function drawDetectionOverlay() {
+            if (lastDetections && lastDetections.length > 0) {
+                lastDetections.forEach(det => {
+                    // Color based on mask detection
+                    const color = det.has_mask ? '#00ff99' : '#ff3333';
+                    
+                    // Draw thick bounding box
+                    ctx.strokeStyle = color;
+                    ctx.lineWidth = 4;
+                    ctx.strokeRect(det.x, det.y, det.width, det.height);
+                    
+                    // Draw label background
+                    const label = det.has_mask ? 'MASK ON' : 'MASK OFF';
+                    ctx.font = 'bold 16px Arial';
+                    const textMetrics = ctx.measureText(label);
+                    const textWidth = textMetrics.width + 12;
+                    const textHeight = 24;
+                    
+                    // Background for label
+                    ctx.fillStyle = color;
+                    ctx.fillRect(det.x, det.y - textHeight - 8, textWidth, textHeight);
+                    
+                    // Text
+                    ctx.fillStyle = '#000';
+                    ctx.fillText(label, det.x + 6, det.y - 6);
+                    
+                    // Confidence label
+                    ctx.fillStyle = color;
+                    ctx.font = 'bold 12px Arial';
+                    ctx.fillText(det.confidence + '%', det.x + 6, det.y + det.height + 20);
+                });
+            }
+        }
+
+        async function detectMask(imageData) {
+            try {
+                console.log('[JS] Sending detection request, image size:', imageData.length);
+                const startTime = Date.now();
+                const response = await fetch('http://127.0.0.1:5000/api/detect', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ image: imageData })
+                });
+                
+                if (!response.ok) {
+                    console.error('[JS] API error, status:', response.status);
+                    throw new Error('Detection failed with status ' + response.status);
+                }
+                
+                const result = await response.json();
+                const latencyMs = Date.now() - startTime;
+                latency.textContent = latencyMs + 'ms';
+                
+                console.log('[JS] Detection response:', {
+                    success: result.success,
+                    faces: result.count,
+                    with_mask: result.masks_detected,
+                    no_mask: result.no_masks_detected,
+                    latency: latencyMs + 'ms'
+                });
+                
+                if (result.success) {
+                    lastDetections = result.detections;
+                    updateStats(result);
+                    updateDetectionDisplay(result.detections);
+                    updateAlerts(result.detections);
+                    frameCount++;
+                }
+            } catch (error) {
+                console.error('[JS] Detection error:', error);
+            }
+        }
+
+        function updateStats(result) {
+            faceCount.textContent = result.count;
+            maskCount.textContent = result.masks_detected;
+            noMaskCount.textContent = result.no_masks_detected;
+            avgConfidence.textContent = result.confidence + '%';
+        }
+
+        function updateDetectionDisplay(detections) {
+            if (detections.length === 0) {
+                detectionsList.innerHTML = '<div class="empty-state">No detections at this moment</div>';
+                return;
+            }
+            detectionsList.innerHTML = detections.map((det, idx) => {
+                const hasMask = det.has_mask;
+                const statusClass = hasMask ? 'detection-safe' : 'detection-unsafe';
+                const statusText = hasMask ? 'MASK ON' : 'MASK OFF';
+                const safetyText = hasMask ? 'SAFE' : 'ALERT';
+                const message = hasMask ? 'Mask detected. Stay protected.' : 'No mask detected. Please wear a mask.';
+                return `
+                    <div class="detection-card ${statusClass}">
+                        <div class="detection-header">
+                            <span class="detection-label">Face ${idx + 1}</span>
+                            <span class="confidence-badge">${det.confidence}%</span>
+                        </div>
+                        <div class="detection-status-row">
+                            <span class="status-label">Status:</span>
+                            <span class="status-value">${statusText}</span>
+                        </div>
+                        <div class="detection-status-row">
+                            <span class="status-label">Safety:</span>
+                            <span class="safety-indicator ${hasMask ? 'safe' : 'unsafe'}">${safetyText}</span>
+                        </div>
+                        <div class="detection-message">${message}</div>
+                        <div class="confidence-bar">
+                            <div class="confidence-fill" style="width: ${det.confidence}%"></div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function updateAlerts(detections) {
+            const currentAlerts = {};
+            const criticalAlerts = [];
+            
+            detections.forEach((det, idx) => {
+                const alertId = 'face_' + idx;
+                currentAlerts[alertId] = det.has_mask;
+                
+                // Check for state changes
+                if (!lastAlerts[alertId] || lastAlerts[alertId] !== det.has_mask) {
+                    if (!det.has_mask) {
+                        // No mask detected - show red alert
+                        criticalAlerts.push({ type: 'critical', message: `Face ${idx + 1}: Please wear a mask` });
+                        showNotification('⚠️ ALERT: No mask detected - Please wear a mask', 'error');
+                    } else if (det.has_mask && lastAlerts[alertId] === false) {
+                        // Mask detected - show green success
+                        showNotification('✓ Mask detected. Stay safe.', 'success');
+                    }
+                }
+            });
+            
+            lastAlerts = currentAlerts;
+            
+            // Update alerts list
+            if (criticalAlerts.length > 0) {
+                alertsList.innerHTML = criticalAlerts.map(alert => 
+                    `<div class="alert-item alert-${alert.type}"><span class="alert-dot"></span><span>${alert.message}</span></div>`
+                ).join('');
+            } else if (detections.length > 0) {
+                const allSafe = detections.every(d => d.has_mask);
+                if (allSafe) {
+                    alertsList.innerHTML = '<div class="no-alerts">✓ All subjects safe - masks detected</div>';
+                } else {
+                    alertsList.innerHTML = '<div class="no-alerts">Monitoring active</div>';
+                }
+            } else {
+                alertsList.innerHTML = '<div class="no-alerts">No faces detected</div>';
+            }
+        }
+
+        function showNotification(message, type = 'info') {
+            const notification = document.createElement('div');
+            notification.className = `notification notification-${type}`;
+            notification.textContent = message;
+            notification.style.cssText = `
+                padding: 16px 20px;
+                margin: 10px;
+                border-radius: 8px;
+                font-weight: 600;
+                font-size: 14px;
+                animation: slideIn 0.3s ease;
+            `;
+            alertNotifications.appendChild(notification);
+            
+            // Auto remove after 5 seconds
+            setTimeout(() => {
+                notification.style.animation = 'slideOut 0.3s ease';
+                setTimeout(() => notification.remove(), 300);
+            }, 5000);
+        }
+
+        function resetStats() {
+            faceCount.textContent = '0';
+            maskCount.textContent = '0';
+            noMaskCount.textContent = '0';
+            avgConfidence.textContent = '0%';
+            fpsCounter.textContent = '0';
+            latency.textContent = '0ms';
+            uptime.textContent = '00:00';
+            detectionsList.innerHTML = '<div class="empty-state">Start monitoring to see detections</div>';
+            alertsList.innerHTML = '<div class="no-alerts">No alerts</div>';
+            lastDetections = [];
+        }
+
+        window.addEventListener('beforeunload', () => {
+            if (mediaStream) mediaStream.getTracks().forEach(track => track.stop());
+        });
+    </script>
+</body>
+</html>

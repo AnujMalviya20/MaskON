@@ -1,0 +1,1 @@
+// All live detection logic is now in live.html inline script.
