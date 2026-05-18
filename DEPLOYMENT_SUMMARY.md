@@ -281,7 +281,7 @@ This is fixed in the current version. Ensure you have the latest code from GitHu
 ## Project Structure After Cloning
 
 ```
-MaskON/
+MaskON/ai
 ├── backend/
 │   ├── app.py                          # Flask server
 │   ├── detect_mask.py                  # Detection logic
