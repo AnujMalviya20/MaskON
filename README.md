@@ -1,6 +1,6 @@
 # MaskVision AI
 
-## Overview
+#Overview
 MaskVision AI is a deep learning and computer vision-based web application designed to detect whether a person is wearing a face mask. The application utilizes a pre-trained MobileNetV2 model for mask detection and provides real-time feedback through a modern user interface. Users can access live webcam detection or upload images for mask detection.
 
 ## Features
