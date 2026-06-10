@@ -1,0 +1,21 @@
+[DEBUG] Loading Haar Cascade from: /Users/anujmalviya/Downloads/MaskON AI/maskvision-ai/backend/venv/lib/python3.11/site-packages/cv2/data/haarcascade_frontalface_default.xml
+[DEBUG] File exists: True
+[OK] ✓ Haar Cascade loaded successfully
+
+============================================================
+🚀 SafeGuard AI - Real-Time Mask Detection Backend
+============================================================
+📍 API Running on: http://127.0.0.1:5000
+📍 Frontend URL: http://127.0.0.1:8000/live.html
+✓ CORS enabled for all /api/* routes
+✓ Face detection with Haar Cascades
+✓ Logging enabled for all requests
+Press CTRL+C to stop
+
+============================================================
+
+ * Serving Flask app 'app'
+ * Debug mode: on
+Address already in use
+Port 5000 is in use by another program. Either identify and stop that program, or start the server with a different port.
+On macOS, try searching for and disabling 'AirPlay Receiver' in System Settings.

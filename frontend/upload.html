@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <title>Image Analysis - SafeGuard AI</title>
+    <link rel="stylesheet" href="css/style.css?v=2024">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="container">
+            <div class="logo">
+                <span class="logo-text">SafeGuard AI</span>
+            </div>
+            <ul class="nav-links">
+                <li><a href="index.html">Dashboard</a></li>
+                <li><a href="live.html">Monitor</a></li>
+                <li><a href="upload.html" class="active">Analyze</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <div class="detection-container">
+        <div class="container">
+            <h1 class="section-title">Image Analysis</h1>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; align-items: start;">
+                <!-- Upload Section -->
+                <div>
+                    <div class="upload-area" id="uploadArea">
+                        <div class="upload-area-icon">UPLOAD</div>
+                        <div class="upload-area-text">Drag and drop your image here</div>
+                        <div class="upload-area-hint">or click to browse files</div>
+                        <input type="file" id="fileInput" accept="image/*" style="display: none;">
+                    </div>
+
+                    <div id="previewSection" style="display: none; margin-top: 2rem;">
+                        <img id="previewImage" class="preview-image" alt="Preview">
+                        <button id="detectBtn" class="btn btn-primary" style="width: 100%; justify-content: center; margin-top: 1rem;">
+                            Analyze Image
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Results Section -->
+                <div>
+                    <div class="control-section">
+                        <h3>Detection Status</h3>
+                        <div class="status-display">
+                            <div class="status-item">
+                                <span class="status-label">Status:</span>
+                                <span class="status-value" id="statusText">Idle</span>
+                            </div>
+                            <div class="status-item">
+                                <span class="status-label">Faces Found:</span>
+                                <span class="status-value" id="faceCountText">0</span>
+                            </div>
+                            <div class="status-item">
+                                <span class="status-label">Avg Confidence:</span>
+                                <span class="status-value" id="confidenceText">0%</span>
+                            </div>
+                            <div class="status-item">
+                                <span class="status-label">With Masks:</span>
+                                <span class="status-value" id="masksText" style="color: #00ff99;">0</span>
+                            </div>
+                            <div class="status-item">
+                                <span class="status-label">Without Masks:</span>
+                                <span class="status-value" id="noMasksText" style="color: #ff3333;">0</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Results -->
+                    <div class="detection-results" id="resultsSection" style="display: none; margin-top: 1rem;">
+                        <div class="result-card">
+                            <h3 style="margin-bottom: 1rem; color: var(--secondary-color);">DETECTION RESULTS</h3>
+                            <div id="resultsList" class="status-display"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <p>SafeGuard AI - Professional AI Safety Monitoring System</p>
+        </div>
+    </footer>
+
+    <script>
+        const uploadArea = document.getElementById('uploadArea');
+        const fileInput = document.getElementById('fileInput');
+        const previewImage = document.getElementById('previewImage');
+        const previewSection = document.getElementById('previewSection');
+        const detectBtn = document.getElementById('detectBtn');
+        const statusText = document.getElementById('statusText');
+        const faceCountText = document.getElementById('faceCountText');
+        const confidenceText = document.getElementById('confidenceText');
+        const masksText = document.getElementById('masksText');
+        const noMasksText = document.getElementById('noMasksText');
+        const resultsList = document.getElementById('resultsList');
+        const resultsSection = document.getElementById('resultsSection');
+
+        let selectedFile = null;
+
+        // Upload area click
+        uploadArea.addEventListener('click', () => fileInput.click());
+
+        // File input change
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file && file.type.startsWith('image/')) {
+                selectedFile = file;
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    previewImage.src = e.target.result;
+                    previewSection.style.display = 'block';
+                    resultsSection.style.display = 'none';
+                    statusText.textContent = 'Ready';
+                    statusText.style.color = '#06b6d4';
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+
+        // Drag and drop
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+        });
+
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('dragover');
+        });
+
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                fileInput.files = files;
+                fileInput.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+        });
+
+        // Detect button
+        detectBtn.addEventListener('click', async () => {
+            if (!selectedFile) return;
+
+            try {
+                statusText.textContent = 'Analyzing...';
+                statusText.style.color = '#f59e0b';
+                detectBtn.disabled = true;
+
+                const formData = new FormData();
+                formData.append('file', selectedFile);
+
+                const response = await fetch('http://127.0.0.1:5000/api/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) throw new Error('Upload failed');
+
+                const result = await response.json();
+
+                if (result.success) {
+                    faceCountText.textContent = result.count;
+                    confidenceText.textContent = result.confidence + '%';
+                    masksText.textContent = result.masks_detected;
+                    noMasksText.textContent = result.no_masks_detected;
+
+                    statusText.textContent = result.count > 0 ? 'Complete' : 'No Faces';
+                    statusText.style.color = result.count > 0 ? '#10b981' : '#94a3b8';
+
+                    resultsSection.style.display = 'block';
+                    updateResults(result.detections);
+                } else {
+                    statusText.textContent = 'Error';
+                    statusText.style.color = '#ef4444';
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                statusText.textContent = 'Error';
+                statusText.style.color = '#ef4444';
+                alert('Error: ' + error.message);
+            } finally {
+                detectBtn.disabled = false;
+            }
+        });
+
+        // Update results display
+        function updateResults(detections) {
+            if (detections.length === 0) {
+                resultsList.innerHTML = '<div style="text-align: center; color: var(--text-secondary); padding: 1rem;">No faces detected</div>';
+                return;
+            }
+
+            resultsList.innerHTML = detections.map((det, idx) => {
+                const isMask = det.label === 'MASK DETECTED';
+                const badgeClass = isMask ? 'badge-mask' : 'badge-no-mask';
+                const icon = isMask ? '✓' : '✗';
+
+                return `
+                    <div class="result-item">
+                        <div class="result-label">
+                            <div class="result-badge ${badgeClass}">${icon}</div>
+                            <span>Face ${idx + 1}: ${det.label}</span>
+                        </div>
+                        <div class="result-confidence">
+                            <div class="confidence-bar">
+                                <div class="confidence-fill" style="width: ${det.confidence}%"></div>
+                            </div>
+                            <div class="confidence-text">${det.confidence}%</div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+    </script>
+</body>
+</html>
