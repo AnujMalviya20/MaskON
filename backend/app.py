@@ -131,4 +131,6 @@ if __name__ == '__main__':
     print('✓ Logging enabled for all requests')
     print('Press CTRL+C to stop\n')
     print('='*60 + '\n')
-    app.run(debug=True, host='127.0.0.1', port=5001, use_reloader=False)
+    import os
+    port = int(os.environ.get('PORT', 5001))
+    app.run(debug=False, host='0.0.0.0', port=port, use_reloader=False)
