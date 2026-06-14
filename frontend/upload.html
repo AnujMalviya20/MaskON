@@ -93,6 +93,15 @@
     </footer>
 
     <script>
+        // Load runtime config
+        window.APP_CONFIG = { api_base: 'http://127.0.0.1:5001' };
+        (async function(){
+            try {
+                const res = await fetch('config.json', {cache: 'no-store'});
+                if (res.ok) window.APP_CONFIG = await res.json();
+            } catch(e){}
+        })();
+    </script>
         const uploadArea = document.getElementById('uploadArea');
         const fileInput = document.getElementById('fileInput');
         const previewImage = document.getElementById('previewImage');
@@ -160,7 +169,7 @@
                 const formData = new FormData();
                 formData.append('file', selectedFile);
 
-                const response = await fetch('http://127.0.0.1:5000/api/upload', {
+                const response = await fetch((window.APP_CONFIG?.api_base || 'http://127.0.0.1:5001') + '/api/upload', {
                     method: 'POST',
                     body: formData
                 });

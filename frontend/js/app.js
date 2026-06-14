@@ -40,7 +40,7 @@ document.addEventListener('DOMContentLoaded', () => {
 // Detect mask function for API calls
 async function detectMask(imageData) {
     try {
-        const response = await fetch('http://127.0.0.1:5000/api/detect', {
+    const response = await fetch(window.APP_CONFIG?.api_base + '/api/detect', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -65,7 +65,7 @@ async function uploadFile(file) {
         const formData = new FormData();
         formData.append('file', file);
 
-        const response = await fetch('http://127.0.0.1:5000/api/upload', {
+    const response = await fetch(window.APP_CONFIG?.api_base + '/api/upload', {
             method: 'POST',
             body: formData
         });
@@ -84,7 +84,7 @@ async function uploadFile(file) {
 // Check backend health
 async function checkBackendHealth() {
     try {
-        const response = await fetch('http://127.0.0.1:5000/api/health');
+    const response = await fetch(window.APP_CONFIG?.api_base + '/api/health');
         return response.ok;
     } catch (error) {
         console.error('Backend not reachable:', error);
