@@ -94,7 +94,7 @@
 
     <script>
         // Load runtime config
-        window.APP_CONFIG = { api_base: 'http://127.0.0.1:5001' };
+        window.APP_CONFIG = { api_base: '' };
         (async function(){
             try {
                 const res = await fetch('config.json', {cache: 'no-store'});
@@ -169,7 +169,7 @@
                 const formData = new FormData();
                 formData.append('file', selectedFile);
 
-                const response = await fetch((window.APP_CONFIG?.api_base || 'http://127.0.0.1:5001') + '/api/upload', {
+                const response = await fetch((window.APP_CONFIG?.api_base || '') + '/api/upload', {
                     method: 'POST',
                     body: formData
                 });
